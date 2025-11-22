@@ -1,0 +1,375 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX_ITEMS 100
+#define MAX_NAME_LENGTH 50
+#define MAX_CATEGORY 30
+#define MENU_FILE "menu.txt"
+#define SALES_FILE "sales.txt"
+#define BILL_FILE "bill.txt"
+
+// Structure for menu items
+typedef struct {
+    int id;
+    char name[MAX_NAME_LENGTH];
+    char category[MAX_CATEGORY];
+    float price;
+    int quantity;
+} MenuItem;
+
+MenuItem menu[MAX_ITEMS];
+int itemCount = 0;
+
+// Function Prototypes
+void displayMenu();
+void displayAllItems();
+void addItem();
+void deleteItem();
+void updateItem();
+void searchItem();
+void sortMenu();
+void sortByPrice();
+void sortByName();
+void generateBill();
+void saveMenuToFile();
+void loadMenuFromFile();
+int findItemById(int id);
+void adminLogin();
+void lowStockCheck(int index);
+
+int main() {
+    system("color 3F"); // Blue UI with white text
+    adminLogin();
+    loadMenuFromFile();
+
+    int choice;
+    printf("=== RESTAURANT BILLING SYSTEM (₹) ===\n");
+
+    do {
+        printf("\n===== MAIN MENU =====\n");
+        printf("1. Display Menu\n");
+        printf("2. Add Item to Menu\n");
+        printf("3. Delete Item from Menu\n");
+        printf("4. Update Item\n");
+        printf("5. Search Item by Name\n");
+        printf("6. Sort Menu\n");
+        printf("7. Generate Bill\n");
+        printf("8. Display All Items (Admin View)\n");
+        printf("9. Save & Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch(choice) {
+            case 1: displayMenu(); break;
+            case 2: addItem(); break;
+            case 3: deleteItem(); break;
+            case 4: updateItem(); break;
+            case 5: searchItem(); break;
+            case 6: sortMenu(); break;
+            case 7: generateBill(); break;
+            case 8: displayAllItems(); break;
+            case 9: saveMenuToFile(); printf("Saved & Exit!\n"); break;
+            default: printf("Invalid choice. Try again!\n");
+        }
+    } while(choice != 9);
+
+    return 0;
+}
+
+void adminLogin() {
+    char pass[20];
+    printf("Enter Admin Password: ");
+    scanf("%s", pass);
+    if(strcmp(pass, "TANMAYA2233") != 0) {
+        printf("Incorrect Password! Access Denied.\n");
+        exit(0);
+    }
+    printf("Access Granted!\n");
+}
+
+void displayMenu() {
+    printf("\n===== MENU (₹) =====\n");
+    printf("%-5s %-20s %-10s %-15s\n", "ID", "Item", "Price", "Category");
+    printf("-----------------------------------------------------\n");
+
+    for(int i = 0; i < itemCount; i++) {
+        printf("%-5d %-20s ₹%-9.2f %-15s\n",
+               menu[i].id, menu[i].name, menu[i].price, menu[i].category);
+    }
+}
+
+void displayAllItems() {
+    printf("\n===== ALL ITEMS (ADMIN VIEW) =====\n");
+    printf("%-5s %-20s %-10s %-10s %-15s\n", "ID", "Item", "Price", "Qty", "Category");
+    printf("---------------------------------------------------------------\n");
+
+    for(int i = 0; i < itemCount; i++) {
+        printf("%-5d %-20s ₹%-9.2f %-10d %-15s\n",
+               menu[i].id, menu[i].name, menu[i].price, menu[i].quantity, menu[i].category);
+    }
+}
+
+void addItem() {
+    if(itemCount >= MAX_ITEMS) {
+        printf("Menu Full!\n");
+        return;
+    }
+
+    MenuItem newItem;
+    printf("\nEnter Item ID: ");
+    scanf("%d", &newItem.id);
+
+    if(findItemById(newItem.id) != -1) {
+        printf("Item with ID already exists!\n");
+        return;
+    }
+
+    printf("Enter Item Name: ");
+    getchar();
+    fgets(newItem.name, MAX_NAME_LENGTH, stdin);
+    newItem.name[strcspn(newItem.name, "\n")] = 0;
+
+    printf("Enter Category: ");
+    fgets(newItem.category, MAX_CATEGORY, stdin);
+    newItem.category[strcspn(newItem.category, "\n")] = 0;
+
+    printf("Enter Item Price (₹): ");
+    scanf("%f", &newItem.price);
+
+    printf("Enter Item Quantity: ");
+    scanf("%d", &newItem.quantity);
+
+    menu[itemCount] = newItem;
+    itemCount++;
+    printf("Item Added Successfully!\n");
+    saveMenuToFile();
+}
+
+void deleteItem() {
+    int id;
+    printf("Enter Item ID to Delete: ");
+    scanf("%d", &id);
+
+    int index = findItemById(id);
+    if(index == -1) {
+        printf("Item not found!\n");
+        return;
+    }
+
+    for(int i = index; i < itemCount - 1; i++)
+        menu[i] = menu[i + 1];
+
+    itemCount--;
+    printf("Deleted Successfully!\n");
+    saveMenuToFile();
+}
+
+void updateItem() {
+    int id;
+    printf("Enter Item ID to Update: ");
+    scanf("%d", &id);
+
+    int index = findItemById(id);
+    if(index == -1) {
+        printf("Item not found!\n");
+        return;
+    }
+
+    printf("Enter New Name (Press Enter to Skip): ");
+    getchar();
+    char newName[50];
+    fgets(newName, 50, stdin);
+    if(strlen(newName) > 1) {
+        newName[strcspn(newName, "\n")] = 0;
+        strcpy(menu[index].name, newName);
+    }
+
+    printf("Enter New Price (₹) (0 to skip): ");
+    float newPrice;
+    scanf("%f", &newPrice);
+    if(newPrice > 0)
+        menu[index].price = newPrice;
+
+    printf("Enter New Quantity (-1 to Skip): ");
+    int newQty;
+    scanf("%d", &newQty);
+    if(newQty >= 0)
+        menu[index].quantity = newQty;
+
+    printf("Updated Successfully!\n");
+    saveMenuToFile();
+}
+
+void searchItem() {
+    char nameSearch[50];
+    printf("Enter Item Name to Search: ");
+    getchar();
+    fgets(nameSearch, 50, stdin);
+    nameSearch[strcspn(nameSearch, "\n")] = 0;
+
+    for(int i = 0; i < itemCount; i++) {
+        if(strcasecmp(menu[i].name, nameSearch) == 0) {
+            printf("Found: %s - ₹%.2f (%s)\n", menu[i].name, menu[i].price, menu[i].category);
+            return;
+        }
+    }
+    printf("No Item Found!\n");
+}
+
+void sortMenu() {
+    int choice;
+    printf("\n1. Sort by Name\n2. Sort by Price\nEnter choice: ");
+    scanf("%d", &choice);
+    if(choice == 1) sortByName();
+    else sortByPrice();
+}
+
+void sortByPrice() {
+    for(int i = 0; i < itemCount - 1; i++)
+        for(int j = i + 1; j < itemCount; j++)
+            if(menu[i].price > menu[j].price) {
+                MenuItem temp = menu[i];
+                menu[i] = menu[j];
+                menu[j] = temp;
+            }
+    printf("Sorted by Price!\n");
+}
+
+void sortByName() {
+    for(int i = 0; i < itemCount - 1; i++)
+        for(int j = i + 1; j < itemCount; j++)
+            if(strcasecmp(menu[i].name, menu[j].name) > 0) {
+                MenuItem temp = menu[i];
+                menu[i] = menu[j];
+                menu[j] = temp;
+            }
+    printf("Sorted by Name!\n");
+}
+
+void lowStockCheck(int index) {
+    if(menu[index].quantity < 5)
+        printf("⚠ Low Stock Warning: Only %d left!\n", menu[index].quantity);
+}
+
+void generateBill() {
+    if(itemCount == 0) {
+        printf("No items to bill!\n");
+        return;
+    }
+
+    int orderItems[MAX_ITEMS];
+    int orderQty[MAX_ITEMS];
+    int orderCount = 0, id, qty;
+    char more;
+
+    printf("\n===== BILLING (₹) =====\nDine-In or Takeaway?\n1. Dine-In\n2. Takeaway\nChoice: ");
+    int orderType; scanf("%d", &orderType);
+
+    displayMenu();
+
+    do {
+        printf("\nEnter Item ID: ");
+        scanf("%d", &id);
+
+        int index = findItemById(id);
+        if(index == -1) {
+            printf("Invalid ID!\n");
+            continue;
+        }
+
+        printf("Enter Quantity: ");
+        scanf("%d", &qty);
+        if(qty <= 0 || qty > menu[index].quantity) {
+            printf("Invalid or insufficient quantity!\n");
+            continue;
+        }
+
+        menu[index].quantity -= qty;
+        orderItems[orderCount] = index;
+        orderQty[orderCount] = qty;
+        orderCount++;
+
+        lowStockCheck(index);
+
+        printf("Add More Items? (Y/N): ");
+        getchar(); scanf("%c", &more);
+
+    } while(more == 'Y' || more == 'y');
+
+    if(orderCount == 0) return;
+
+    // BILL DISPLAY
+    float grandTotal = 0;
+    printf("\n===== FINAL BILL =====\n");
+    printf("%-20s %-10s %-10s %-10s\n", "Item", "Price", "Qty", "Total");
+
+    for(int i = 0; i < orderCount; i++) {
+        int idx = orderItems[i];
+        float total = menu[idx].price * orderQty[i];
+        grandTotal += total;
+        printf("%-20s ₹%-9.2f %-10d ₹%-9.2f\n", menu[idx].name, menu[idx].price, orderQty[i], total);
+    }
+
+    float discount, gstRate;
+    printf("\nEnter Discount (%%): ");
+    scanf("%f", &discount);
+    printf("Enter GST (%%): ");
+    scanf("%f", &gstRate);
+
+    float discountAmt = grandTotal * discount / 100;
+    float gstAmt = grandTotal * gstRate / 100;
+    float finalTotal = grandTotal - discountAmt + gstAmt;
+
+    printf("\n=== BILL SUMMARY ===\n");
+    printf("Subtotal     : ₹%.2f\n", grandTotal);
+    printf("Discount     : ₹%.2f\n", discountAmt);
+    printf("GST          : ₹%.2f\n", gstAmt);
+    printf("Final Total  : ₹%.2f\n", finalTotal);
+
+    // SAVE BILL IN SALES FILE
+    FILE *sales = fopen(SALES_FILE, "a");
+    time_t t; time(&t);
+    fprintf(sales, "Bill: ₹%.2f Date: %s", finalTotal, ctime(&t));
+    fclose(sales);
+
+    saveMenuToFile();
+    printf("\nThank You for Ordering! 😊\n");
+}
+
+int findItemById(int id) {
+    for(int i = 0; i < itemCount; i++)
+        if(menu[i].id == id)
+            return i;
+    return -1;
+}
+
+void saveMenuToFile() {
+    FILE *file = fopen(MENU_FILE, "w");
+    fprintf(file, "%d\n", itemCount);
+    for(int i = 0; i < itemCount; i++)
+        fprintf(file, "%d\n%s\n%s\n%.2f\n%d\n", menu[i].id, menu[i].name,
+                menu[i].category, menu[i].price, menu[i].quantity);
+    fclose(file);
+}
+
+void loadMenuFromFile() {
+    FILE *file = fopen(MENU_FILE, "r");
+    if(file == NULL) return;
+
+    fscanf(file, "%d", &itemCount);
+    for(int i = 0; i < itemCount; i++) {
+        fscanf(file, "%d", &menu[i].id);
+        fgetc(file);
+        fgets(menu[i].name, MAX_NAME_LENGTH, file);
+        menu[i].name[strcspn(menu[i].name, "\n")] = 0;
+        fgets(menu[i].category, MAX_CATEGORY, file);
+        menu[i].category[strcspn(menu[i].category, "\n")] = 0;
+        fscanf(file, "%f", &menu[i].price);
+        fscanf(file, "%d", &menu[i].quantity);
+    }
+    fclose(file);
+}
+
+explain bit by bit this code 
